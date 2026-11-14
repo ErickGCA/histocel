@@ -5,11 +5,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class EngineError(RuntimeError):
-    """Raised when an engine is unknown, not installed, or fails to train."""
+    """Raised when an engine is unknown, not installed, or fails."""
 
 
 @dataclass(frozen=True)
@@ -36,11 +36,30 @@ class TrainResult:
     model: str = ""  # the starting point actually used
 
 
+@dataclass(frozen=True)
+class TileDetection:
+    """One cell found in one tile, in that tile's pixel coordinates."""
+
+    class_index: int
+    polygon: tuple[tuple[float, float], ...]
+    score: float
+
+
+# Takes one tile (a PIL image) and returns the cells found in it.
+Predictor = Callable[[Any], list[TileDetection]]
+
+
 class Engine(Protocol):
     name: str
 
     def train(self, dataset_dir: Path, work_dir: Path, settings: TrainSettings) -> TrainResult:
         """Train on a dataset built by ``histocel build``; write engine files to ``work_dir``."""
+        ...
+
+    def load(
+        self, weights: Path, image_size: int, confidence: float, device: str | None
+    ) -> Predictor:
+        """Load trained weights and return a function that analyses one tile."""
         ...
 
 

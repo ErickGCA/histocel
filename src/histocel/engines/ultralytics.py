@@ -8,7 +8,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from histocel.engines.base import EngineError, TrainResult, TrainSettings
+from histocel.engines.base import (
+    EngineError,
+    Predictor,
+    TileDetection,
+    TrainResult,
+    TrainSettings,
+)
 
 DEFAULT_MODEL = "yolo11n-seg.pt"
 
@@ -85,3 +91,32 @@ class UltralyticsEngine:
             engine_version=str(self._ultralytics.__version__),
             model=model_name,
         )
+
+    def load(
+        self, weights: Path, image_size: int, confidence: float, device: str | None
+    ) -> Predictor:
+        try:
+            model = self._ultralytics.YOLO(str(weights))
+        except Exception as error:
+            raise EngineError(f"could not load {weights}: {error}") from error
+        options = {"imgsz": image_size, "conf": confidence, "verbose": False, "retina_masks": True}
+        if device is not None:
+            options["device"] = device
+
+        def predict(tile) -> list[TileDetection]:
+            try:
+                result = model.predict(tile, **options)[0]
+            except Exception as error:
+                raise EngineError(f"ultralytics prediction failed: {error}") from error
+            if result.masks is None:
+                return []
+            classes = result.boxes.cls.tolist()
+            scores = result.boxes.conf.tolist()
+            found = []
+            for outline, class_index, score in zip(result.masks.xy, classes, scores, strict=True):
+                if len(outline) >= 3:
+                    points = tuple((float(x), float(y)) for x, y in outline)
+                    found.append(TileDetection(int(class_index), points, float(score)))
+            return found
+
+        return predict

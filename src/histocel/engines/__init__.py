@@ -8,6 +8,8 @@ or replacing one does not touch anything else.
 from histocel.engines.base import (
     Engine,
     EngineError,
+    Predictor,
+    TileDetection,
     TrainResult,
     TrainSettings,
     available_engines,
@@ -18,6 +20,8 @@ from histocel.engines.base import (
 __all__ = [
     "Engine",
     "EngineError",
+    "Predictor",
+    "TileDetection",
     "TrainResult",
     "TrainSettings",
     "available_engines",
