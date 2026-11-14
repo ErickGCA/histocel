@@ -17,7 +17,7 @@ from histocel.core.annotation import METHOD_MANUAL, METHODS
 from histocel.core.taxonomy import Taxonomy, TaxonomyError
 
 CONFIG_NAME = "histocel.yaml"
-TOP_LEVEL_KEYS = {"classes", "groupings", "sources", "slides", "split", "tiling"}
+TOP_LEVEL_KEYS = {"classes", "groupings", "sources", "slides", "split", "tiling", "dataset"}
 SOURCE_KEYS = {"format", "path", "method", "reviewed", "annotator", "group", "searched", "names"}
 
 
@@ -53,6 +53,13 @@ class TilingConfig:
 
 
 @dataclass(frozen=True)
+class DatasetConfig:
+    grouping: str | None = None  # named grouping of classes to train on
+    min_visible: float = 0.25  # a cell enters a tile when this much of it is inside
+    background: float = 0.1  # share of the tiles without cells kept as background examples
+
+
+@dataclass(frozen=True)
 class Project:
     root: Path
     taxonomy: Taxonomy
@@ -60,6 +67,7 @@ class Project:
     slide_groups: Mapping[str, str] = field(default_factory=dict)
     split: SplitConfig = SplitConfig()
     tiling: TilingConfig = TilingConfig()
+    dataset: DatasetConfig = DatasetConfig()
 
     @property
     def images_dir(self) -> Path:
@@ -176,6 +184,20 @@ def load_project(root: Path) -> Project:
     if tiling_config.size <= 0 or not 0 <= tiling_config.overlap < tiling_config.size:
         raise ProjectError("tiling: size must be positive and overlap in [0, size)")
 
+    dataset = _mapping(data.get("dataset"), "dataset")
+    _unknown_keys(dataset, {"grouping", "min_visible", "background"}, "dataset")
+    dataset_config = DatasetConfig(
+        grouping=str(dataset["grouping"]) if dataset.get("grouping") is not None else None,
+        min_visible=float(dataset.get("min_visible", DatasetConfig.min_visible)),
+        background=float(dataset.get("background", DatasetConfig.background)),
+    )
+    if not 0 < dataset_config.min_visible <= 1 or not 0 <= dataset_config.background <= 1:
+        raise ProjectError("dataset: min_visible must be in (0, 1] and background in [0, 1]")
+    if dataset_config.grouping is not None and dataset_config.grouping not in taxonomy.groupings:
+        raise ProjectError(
+            f"dataset.grouping: {dataset_config.grouping!r} is not declared under `groupings`"
+        )
+
     return Project(
         root=root.resolve(),
         taxonomy=taxonomy,
@@ -187,6 +209,7 @@ def load_project(root: Path) -> Project:
             seed=int(split.get("seed", SplitConfig.seed)),
         ),
         tiling=tiling_config,
+        dataset=dataset_config,
     )
 
 
@@ -234,6 +257,12 @@ split:
 tiling:
   size: 320           # tile side, in pixels
   overlap: 64         # keep this larger than your largest cell
+
+# Optional: how the training dataset is built.
+# dataset:
+#   grouping: coarse    # train on a named grouping instead of the individual classes
+#   min_visible: 0.25   # a cell enters a tile when at least this share of it is inside
+#   background: 0.1     # share of the tiles without any cell kept as background examples
 """
 
 
