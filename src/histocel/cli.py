@@ -2,16 +2,30 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from dataclasses import replace
 from pathlib import Path
 
 import typer
 import yaml
+from PIL import Image
 
 from histocel import __version__
 from histocel.check import ERROR, WARNING, run_checks
 from histocel.dataset import BuildError, build_dataset
+from histocel.engines import EngineError
+from histocel.evaluation import EvaluationError, evaluate_model
+from histocel.inference import (
+    InferenceError,
+    ModelCard,
+    load_model_card,
+    open_predictor,
+    predict_slide,
+    render,
+    to_annotation,
+)
+from histocel.inference.slide import count
 from histocel.ingest import IngestError, import_project
 from histocel.project import (
     CONFIG_NAME,
@@ -21,8 +35,9 @@ from histocel.project import (
     init_project,
     load_project,
 )
+from histocel.sources import IMAGE_SUFFIXES, slide_id_from
 from histocel.sources.coco import to_coco
-from histocel.store import load_annotations
+from histocel.store import load_annotations, save_annotation
 from histocel.synthetic import default_styles, generate_slide
 from histocel.training import TrainingError, list_runs, train_run
 
@@ -31,6 +46,8 @@ app = typer.Typer(
     add_completion=False,
     help="Segment, classify and count cells in microscopy slide images.",
 )
+
+NEWLINE = "\n"
 
 PROJECT_OPTION = typer.Option(
     None, "--project", "-p", help="Project folder. Default: found from the current folder."
@@ -181,6 +198,123 @@ def runs(project: Path | None = PROJECT_OPTION) -> None:
             f"{record.run_id:<{width}}  {record.data['dataset']['hash'][:8]:<10}"
             f"{record.data['epochs_run']:>7}{(f'{score:.3f}' if score is not None else '-'):>12}"
         )
+
+
+def _model(loaded: Project | None, model: Path | None, run: str | None) -> tuple[ModelCard, Path]:
+    """The model to use: an explicit folder, a named run, or the project's latest run."""
+    try:
+        if model is not None:
+            return load_model_card(model), model.parent
+        if loaded is None:
+            raise InferenceError("give a model folder with --model, or run inside a project")
+        records = list_runs(loaded)
+        if run is not None:
+            records = [r for r in records if r.run_id == run]
+        if not records:
+            which = f"run {run!r}" if run else "any training run"
+            raise InferenceError(f"could not find {which}. See the `runs` command.")
+        return load_model_card(records[-1].model_dir), records[-1].path
+    except InferenceError as error:
+        raise _fail(str(error)) from None
+
+
+@app.command()
+def predict(
+    images: list[Path] = typer.Argument(..., help="Slide images, or folders of them."),
+    model: Path | None = typer.Option(
+        None, "--model", "-m", help="Model folder (runs/<run>/model)."
+    ),
+    run: str | None = typer.Option(
+        None, help="Run id to take the model from. Default: the latest."
+    ),
+    out: Path = typer.Option(Path("predictions"), help="Folder for the results."),
+    confidence: float = typer.Option(0.25, min=0.0, max=1.0, help="Minimum detection confidence."),
+    device: str | None = typer.Option(None, help="For example: cpu, 0. Default: automatic."),
+    project: Path | None = PROJECT_OPTION,
+) -> None:
+    """Find, classify and count the cells on whole slides."""
+    loaded = _project(project) if model is None else None
+    card, _ = _model(loaded, model, run)
+    files: list[Path] = []
+    for path in images:
+        if path.is_dir():
+            files += sorted(p for p in path.iterdir() if p.suffix.lower() in IMAGE_SUFFIXES)
+        elif path.is_file():
+            files.append(path)
+        else:
+            raise _fail(f"{path} does not exist")
+    if not files:
+        raise _fail("no images to analyse")
+    try:
+        predictor = open_predictor(card, confidence, device)
+    except InferenceError as error:
+        raise _fail(str(error)) from None
+
+    out.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for path in files:
+        slide_id = slide_id_from(path.name)
+        with Image.open(path) as image:
+            try:
+                detections = predict_slide(image, predictor, card)
+            except (InferenceError, EngineError) as error:
+                raise _fail(f"{path.name}: {error}") from None
+            render(image, detections, card.classes).save(out / f"{slide_id}.png")
+            annotation = to_annotation(
+                slide_id, path.name, image.size, detections, f"model:{card.dataset_hash[:8]}"
+            )
+        save_annotation(annotation, out / "canonical")
+        totals = count(detections, card.classes)
+        rows.append({"slide": slide_id, **totals, "total": sum(totals.values())})
+        typer.echo(f"{slide_id}: " + ", ".join(f"{n} {name}" for name, n in totals.items()))
+
+    with (out / "counts.csv").open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["slide", *card.classes, "total"])
+        writer.writeheader()
+        writer.writerows(rows)
+    typer.echo(f"marked images, counts.csv and annotations written to {out}")
+    typer.echo("These counts have no known error until the model is evaluated (`evaluate`).")
+
+
+@app.command()
+def evaluate(
+    project: Path | None = PROJECT_OPTION,
+    run: str | None = typer.Option(None, help="Run id. Default: the latest."),
+    iou: float = typer.Option(0.5, min=0.05, max=1.0, help="Overlap needed to match two outlines."),
+    confidence: float = typer.Option(0.25, min=0.0, max=1.0, help="Minimum detection confidence."),
+    device: str | None = typer.Option(None, help="For example: cpu, 0. Default: automatic."),
+) -> None:
+    """Grade a model on the test slides: detection, classification, outline and counting."""
+    loaded = _project(project)
+    card, run_dir = _model(loaded, None, run)
+    try:
+        predictor = open_predictor(card, confidence, device)
+        report = evaluate_model(
+            loaded,
+            load_annotations(loaded.canonical_dir),
+            card,
+            predictor,
+            iou_threshold=iou,
+            confidence=confidence,
+        )
+    except (EvaluationError, InferenceError, EngineError) as error:
+        raise _fail(str(error)) from None
+
+    target = run_dir / "evaluation.json"
+    target.write_text(json.dumps(report, indent=2) + NEWLINE, encoding="utf-8", newline=NEWLINE)
+    typer.echo(f"{len(report['test_slides'])} test slide(s), outlines matched at IoU >= {iou}")
+    width = max(len(name) for name in report["metrics"])
+    for name, metric in report["metrics"].items():
+        if metric["value"] is None:
+            typer.echo(f"{name:<{width}}  n/a")
+        elif metric["low"] is None:
+            typer.echo(f"{name:<{width}}  {metric['value']:.3f}")
+        else:
+            interval = f"[{metric['low']:.3f}, {metric['high']:.3f}]"
+            typer.echo(f"{name:<{width}}  {metric['value']:.3f}  {interval}")
+    for note in report["notes"]:
+        typer.secho(f"note: {note}", fg=typer.colors.YELLOW)
+    typer.echo(f"written to {target}")
 
 
 @app.command()
