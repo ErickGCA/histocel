@@ -109,13 +109,15 @@ class Detection:
     label: str
     polygon: list[Point]
     score: float = 1.0
+    whole: bool = True  # False when the outline was cut by the border of its tile
 
 
 def merge_duplicates(detections: Sequence[Detection], threshold: float = 0.5) -> list[Detection]:
     """Collapse detections of the same cell coming from overlapping tiles.
 
-    Greedy suppression: candidates are visited from the most confident (ties broken
-    by larger area, so the whole copy beats the truncated one) and a candidate is
+    Greedy suppression: outlines that were not cut by a tile border come first, then
+    the most confident (ties broken by larger area, so the whole copy beats the
+    truncated one) and a candidate is
     dropped when it overlaps an already kept detection by more than ``threshold``
     of the smaller area. Merging ignores the label: two tiles disagreeing on the
     class of one cell still describe one cell.
@@ -124,7 +126,9 @@ def merge_duplicates(detections: Sequence[Detection], threshold: float = 0.5) ->
         raise ValueError("threshold must be in (0, 1]")
     shapes = [to_shape(d.polygon) for d in detections]
     order = sorted(
-        range(len(detections)), key=lambda i: (detections[i].score, shapes[i].area), reverse=True
+        range(len(detections)),
+        key=lambda i: (detections[i].whole, detections[i].score, shapes[i].area),
+        reverse=True,
     )
     tree = STRtree(shapes)
     kept: set[int] = set()
