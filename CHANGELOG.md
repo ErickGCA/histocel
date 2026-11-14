@@ -16,3 +16,5 @@ This project follows [Semantic Versioning](https://semver.org/). Until 1.0, mino
 - `histocel check`: reports split leakage, unreviewed outlines in the test set, undeclared or rare classes, missing images and tiling settings smaller than the cells.
 - `histocel synth` now creates a complete project (images, COCO export, configuration).
 - `histocel build`: group-aware split, overlapping tiles with geometric clipping, background tiles, YOLO segmentation export and a manifest with a content hash. Test slides never enter the dataset.
+- `histocel train` and `histocel runs`: training engines behind an interface, Ultralytics YOLO segmentation as the first engine (optional `train` extra), a record per run and a self-describing model folder.
+- Colab notebook that installs histocel and runs the same commands on a GPU.

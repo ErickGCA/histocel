@@ -4,7 +4,7 @@ A command line tool to train and use models that **outline, classify and count c
 
 histocel ships no images, no classes and no pretrained models. You point it at your slides and annotations, declare your classes, and run.
 
-> **Status: pre-alpha.** You can create a project, import annotations (COCO, YOLO-seg, QuPath GeoJSON) and check it for problems and build the training dataset. Training, inference and evaluation are under construction. See the [roadmap](#roadmap).
+> **Status: pre-alpha.** You can create a project, import annotations (COCO, YOLO-seg, QuPath GeoJSON) and check it for problems, build the training dataset and train a model. Whole-slide inference and evaluation are under construction. See the [roadmap](#roadmap).
 
 ## Why it exists
 
@@ -74,6 +74,26 @@ The internal annotation format is described in [docs/canonical-format.md](docs/c
 - **A share of the empty tiles is kept** so the model also sees plain background.
 - **The manifest holds a hash of the content.** Same annotations and settings, same hash, on any machine. Treat the folder as disposable: never edit it, rebuild it.
 
+## Training
+
+Training needs the optional engine, which pulls in PyTorch:
+
+```bash
+pip install "histocel[train] @ git+https://github.com/ErickGCA/histocel"
+
+histocel train --name first-try      # settings come from the `training` section of histocel.yaml
+histocel runs                        # list recorded runs
+```
+
+Without a GPU, use [notebooks/train_on_colab.ipynb](notebooks/train_on_colab.ipynb): it installs histocel and runs the same commands on a free Colab GPU, with your project folder on Google Drive.
+
+Each run gets a folder under `runs/`:
+
+- `run.json` records the dataset hash, the split, the settings and the histocel and engine versions.
+- `model/` holds the weights and a `model.json` with the classes and tile size the model expects, so it cannot be used with the wrong ones.
+
+The scores printed by `train` are measured on validation tiles and only steer training. The final score comes from whole test slides, in the evaluation stage.
+
 ## Roadmap
 
 | Stage | Delivers | Status |
@@ -81,7 +101,7 @@ The internal annotation format is described in [docs/canonical-format.md](docs/c
 | 1 | Pure core, synthetic slides, tests and CI | done |
 | 2 | `init`, `import` (COCO, YOLO-seg, QuPath GeoJSON) and `check` | done |
 | 3 | `build`: split by slide and group, tiling, manifest | done |
-| 4 | `train`: training engine, run records, Colab notebook | to do |
+| 4 | `train`: training engine, run records, Colab notebook | done |
 | 5 | Whole-slide `predict` and `evaluate` with counting error | to do |
 | 6 | Box input with assisted outlines (SAM) | to do |
 | 7 | User guide and version 0.1 | to do |
