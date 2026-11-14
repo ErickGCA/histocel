@@ -4,7 +4,7 @@ A command line tool to train and use models that **outline, classify and count c
 
 histocel ships no images, no classes and no pretrained models. You point it at your slides and annotations, declare your classes, and run.
 
-> **Status: pre-alpha.** The core (geometry, tiling, taxonomy, data splitting) and the synthetic slide generator are done and tested. Import, training, inference and evaluation are under construction. See the [roadmap](#roadmap).
+> **Status: pre-alpha.** You can create a project, import annotations (COCO, YOLO-seg, QuPath GeoJSON) and check it for problems. Dataset building, training, inference and evaluation are under construction. See the [roadmap](#roadmap).
 
 ## Why it exists
 
@@ -24,10 +24,28 @@ git clone https://github.com/ErickGCA/histocel
 cd histocel
 pip install -e .
 
-histocel synth demo --slides 4
+histocel synth demo          # a complete project of synthetic slides
+histocel import -p demo      # annotations -> canonical format
+histocel check -p demo       # problems to fix before training
 ```
 
-This creates four synthetic slides in `demo/` (coloured ellipses on a pinkish background) with the exact answer key for every cell in histocel's format. They look nothing like real tissue: they exist to show the tool working and to test the code against a known answer.
+`synth` creates six synthetic slides in `demo/` (coloured ellipses on a pinkish background), a COCO export with the exact outline of every cell, and a `histocel.yaml`. They look nothing like real tissue: they exist to show the tool working and to test the code against a known answer.
+
+## With your own data
+
+```bash
+histocel init my-project
+```
+
+Put your images in `my-project/raw/images/` and your annotation exports in `my-project/raw/annotations/`, then edit `my-project/histocel.yaml`: list your classes (with the spellings your exports use as aliases) and your annotation sources. Run `histocel import` and `histocel check` from inside the folder.
+
+| Format | `format:` | Notes |
+|---|---|---|
+| COCO instance segmentation | `coco` | One JSON file. Polygon outlines only; RLE masks are skipped. |
+| YOLO segmentation | `yolo-seg` | A folder of `.txt` files. Needs `names: [...]` in the source. |
+| QuPath GeoJSON | `qupath` | One `.geojson` per image, named after the image. |
+
+`check` stops you before the mistakes that are expensive to find later: a class name nobody declared, slides of one animal on both sides of the split, a test slide whose outlines no person ever reviewed, an overlap smaller than your largest cell.
 
 ## How your data comes in
 
@@ -51,7 +69,7 @@ The internal annotation format is described in [docs/canonical-format.md](docs/c
 | Stage | Delivers | Status |
 |---|---|---|
 | 1 | Pure core, synthetic slides, tests and CI | done |
-| 2 | `init`, `import` (COCO, YOLO-seg) and `check` | to do |
+| 2 | `init`, `import` (COCO, YOLO-seg, QuPath GeoJSON) and `check` | done |
 | 3 | `build`: split by slide and group, tiling, manifest | to do |
 | 4 | `train`: training engine, run records, Colab notebook | to do |
 | 5 | Whole-slide `predict` and `evaluate` with counting error | to do |

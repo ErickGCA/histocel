@@ -11,3 +11,7 @@ This project follows [Semantic Versioning](https://semver.org/). Until 1.0, mino
 - Synthetic slide generator with exact answer keys, and the `histocel synth` command.
 - Architecture tests that enforce the layering rules and that no data ships with the repository.
 - CI on GitHub Actions: lint, format and tests on Python 3.10 and 3.13.
+- Project folders configured by `histocel.yaml`, with `histocel init`.
+- `histocel import`: COCO, YOLO-seg and QuPath GeoJSON adapters, with class aliases resolved and provenance recorded per cell.
+- `histocel check`: reports split leakage, unreviewed outlines in the test set, undeclared or rare classes, missing images and tiling settings smaller than the cells.
+- `histocel synth` now creates a complete project (images, COCO export, configuration).
