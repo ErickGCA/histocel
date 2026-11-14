@@ -7,7 +7,7 @@ from histocel.sources import SourceError, find_image, formats, read_source, slid
 
 
 def test_builtin_formats_are_registered():
-    assert formats() == ["coco", "qupath", "yolo-seg"]
+    assert formats() == ["coco", "qupath", "yolo-bbox", "yolo-seg"]
 
 
 @pytest.mark.parametrize(

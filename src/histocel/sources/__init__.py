@@ -16,7 +16,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from histocel.core.geometry import Point
+from histocel.core.geometry import Point, Rect
 from histocel.project import SourceSpec
 
 IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".jfif", ".webp")
@@ -30,6 +30,9 @@ class SourceError(ValueError):
 class RawCell:
     label: str  # as written by the annotation tool
     polygon: tuple[Point, ...]  # slide pixel coordinates
+    # Set when the tool only gave a box: the polygon is then just its corners
+    # and an assist must replace it with a real outline.
+    box: Rect | None = None
 
 
 @dataclass(frozen=True)
@@ -74,7 +77,7 @@ def read_source(spec: SourceSpec, images_dir: Path) -> list[RawSlide]:
 
 
 def _load_builtin() -> None:
-    from histocel.sources import coco, qupath, yolo_seg  # noqa: F401  (registers on import)
+    from histocel.sources import coco, qupath, yolo_bbox, yolo_seg  # noqa: F401
 
 
 def slide_id_from(file_name: str) -> str:

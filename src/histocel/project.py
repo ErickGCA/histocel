@@ -28,7 +28,18 @@ TOP_LEVEL_KEYS = {
     "dataset",
     "training",
 }
-SOURCE_KEYS = {"format", "path", "method", "reviewed", "annotator", "group", "searched", "names"}
+SOURCE_KEYS = {
+    "format",
+    "path",
+    "method",
+    "reviewed",
+    "annotator",
+    "group",
+    "searched",
+    "names",
+    "assist",
+    "assist_model",
+}
 
 
 class ProjectError(ValueError):
@@ -47,6 +58,8 @@ class SourceSpec:
     group: str | None = None  # default group for the slides of this batch
     searched: tuple[str, ...] | None = None  # classes the annotator looked for
     names: tuple[str, ...] | None = None  # class names by index, for formats that need them
+    assist: str | None = None  # outliner that turns boxes into outlines, e.g. "sam"
+    assist_model: str | None = None  # model for the outliner; None = its default
 
 
 @dataclass(frozen=True)
@@ -155,6 +168,8 @@ def _source(raw: Any, index: int, root: Path) -> SourceSpec:
         group=str(data["group"]) if data.get("group") is not None else None,
         searched=tuple(map(str, searched)) if searched is not None else None,
         names=tuple(map(str, names)) if names is not None else None,
+        assist=str(data["assist"]) if data.get("assist") is not None else None,
+        assist_model=(str(data["assist_model"]) if data.get("assist_model") is not None else None),
     )
 
 
@@ -271,7 +286,8 @@ classes:
 #     merged-name: [cell-type-a, cell-type-b]
 
 # Where your annotations come from. Paths are relative to this file.
-# Formats: coco, yolo-seg (needs `names`), qupath (one .geojson per image).
+# Formats: coco, yolo-seg (needs `names`), qupath (one .geojson per image),
+# yolo-bbox (boxes; needs `names` and `assist: sam` to turn them into outlines).
 sources: []
 #  - format: coco
 #    path: raw/annotations/batch1.json
