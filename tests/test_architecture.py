@@ -15,9 +15,8 @@ PACKAGE = ROOT / "src" / "histocel"
 
 CORE_ALLOWED_THIRD_PARTY = {"shapely"}
 CONFINED = {
-    "ultralytics": "engines/ultralytics.py",
-    "torch": "engines/ultralytics.py",
-    "segment_anything": "assist/sam.py",
+    "ultralytics": {"engines/ultralytics.py", "assist/sam.py"},
+    "torch": {"engines/ultralytics.py", "assist/sam.py"},
 }
 DATA_SUFFIXES = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".jfif", ".pt", ".pth", ".onnx", ".zip"}
 
@@ -63,7 +62,7 @@ def test_heavy_libraries_are_confined_to_their_wrapper():
         for module in _imports(path):
             top = module.split(".")[0]
             if top in CONFINED:
-                assert relative == CONFINED[top], f"{relative} imports {top}"
+                assert relative in CONFINED[top], f"{relative} imports {top}"
 
 
 def test_repository_ships_no_data():

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "histocel"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Segment, classify and count cells in microscopy slide images, with your own data."
 readme = "README.md"
 license = "AGPL-3.0-only"
@@ -13,7 +13,7 @@ requires-python = ">=3.10"
 authors = [{ name = "ErickGCA" }]
 keywords = ["histology", "microscopy", "instance-segmentation", "cell-counting"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Image Recognition",
@@ -29,6 +29,8 @@ dependencies = [
 [project.optional-dependencies]
 # The training engine. Kept optional: it pulls in PyTorch.
 train = ["ultralytics>=8.3,<9"]
+# Box-to-outline assisted annotation with the Segment Anything family.
+sam = ["ultralytics>=8.3,<9"]
 
 [project.scripts]
 histocel = "histocel.cli:app"

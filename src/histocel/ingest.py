@@ -9,11 +9,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from histocel.core.annotation import Cell, SlideAnnotation
+from PIL import Image
+
+from histocel.assist import AssistError, Outliner, get_outliner
+from histocel.core.annotation import METHOD_ASSISTED, Cell, SlideAnnotation
 from histocel.core.geometry import InvalidPolygonError, to_shape
 from histocel.core.taxonomy import UnknownLabelError
 from histocel.project import Project
-from histocel.sources import SourceError, read_source
+from histocel.sources import RawCell, RawSlide, SourceError, read_source
 from histocel.store import save_annotation
 
 
@@ -27,6 +30,29 @@ class ImportReport:
     cells: int = 0
     notes: list[str] = field(default_factory=list)
     removed: list[str] = field(default_factory=list)  # stale canonical files deleted
+
+
+def _outline(
+    raw: RawSlide, outliner: Outliner, images_dir: Path
+) -> tuple[tuple[RawCell, ...], int]:
+    """Replace the boxes of a slide with outlines. Returns the cells and how many failed."""
+    boxes = [cell.box for cell in raw.cells if cell.box is not None]
+    with Image.open(images_dir / raw.image) as image:
+        outlines = outliner(image.convert("RGB"), boxes)
+    if len(outlines) != len(boxes):
+        raise AssistError(f"expected {len(boxes)} outlines, got {len(outlines)}")
+    by_box = iter(outlines)
+    cells, failed = [], 0
+    for cell in raw.cells:
+        if cell.box is None:
+            cells.append(cell)
+            continue
+        outline = next(by_box)
+        if outline is None:
+            failed += 1
+        else:
+            cells.append(RawCell(cell.label, outline, box=cell.box))
+    return tuple(cells), failed
 
 
 def build_annotations(project: Project) -> tuple[list[SlideAnnotation], list[str]]:
@@ -45,6 +71,18 @@ def build_annotations(project: Project) -> tuple[list[SlideAnnotation], list[str
         except SourceError as error:
             raise IngestError(f"{origin}: {error}") from None
 
+        outliner = None
+        if spec.assist is not None:
+            try:
+                outliner = get_outliner(spec.assist, spec.assist_model)
+            except AssistError as error:
+                raise IngestError(f"{origin}: {error}") from None
+        elif any(cell.box is not None for raw in raw_slides for cell in raw.cells):
+            raise IngestError(
+                f"{origin}: this source holds boxes, not outlines. Add `assist: sam` to it "
+                "to turn each box into an outline."
+            )
+
         if spec.searched is not None:
             try:
                 searched = tuple(project.taxonomy.resolve(name) for name in spec.searched)
@@ -55,8 +93,16 @@ def build_annotations(project: Project) -> tuple[list[SlideAnnotation], list[str
 
         for raw in raw_slides:
             notes.extend(f"{raw.slide_id}: {note}" for note in raw.notes)
+            raw_cells = raw.cells
+            if outliner is not None:
+                try:
+                    raw_cells, failed = _outline(raw, outliner, project.images_dir)
+                except AssistError as error:
+                    raise IngestError(f"{origin}: {raw.slide_id}: {error}") from None
+                if failed:
+                    notes.append(f"{raw.slide_id}: {failed} box(es) could not be outlined")
             cells, dropped = [], 0
-            for raw_cell in raw.cells:
+            for raw_cell in raw_cells:
                 try:
                     label = project.taxonomy.resolve(raw_cell.label)
                 except UnknownLabelError:
@@ -71,7 +117,9 @@ def build_annotations(project: Project) -> tuple[list[SlideAnnotation], list[str
                     Cell(
                         label=label,
                         polygon=raw_cell.polygon,
-                        method=spec.method,
+                        # An outline made by a tool is assisted, whatever the source says.
+                        method=METHOD_ASSISTED if outliner is not None else spec.method,
+                        box=raw_cell.box,
                         reviewed=spec.reviewed,
                         source=origin,
                         annotator=spec.annotator,

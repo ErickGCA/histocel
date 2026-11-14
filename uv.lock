@@ -881,7 +881,7 @@ wheels = [
 
 [[package]]
 name = "histocel"
-version = "0.1.0.dev0"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -896,6 +896,10 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+sam = [
+    { name = "ultralytics", version = "8.4.123", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' and sys_platform == 'darwin'" },
+    { name = "ultralytics", version = "8.4.212", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or sys_platform != 'darwin'" },
+]
 train = [
     { name = "ultralytics", version = "8.4.123", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' and sys_platform == 'darwin'" },
     { name = "ultralytics", version = "8.4.212", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or sys_platform != 'darwin'" },
@@ -914,9 +918,10 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "shapely", specifier = ">=2.0" },
     { name = "typer", specifier = ">=0.12" },
+    { name = "ultralytics", marker = "extra == 'sam'", specifier = ">=8.3,<9" },
     { name = "ultralytics", marker = "extra == 'train'", specifier = ">=8.3,<9" },
 ]
-provides-extras = ["train"]
+provides-extras = ["train", "sam"]
 
 [package.metadata.requires-dev]
 dev = [
