@@ -252,6 +252,7 @@ def predict(
 
     out.mkdir(parents=True, exist_ok=True)
     rows = []
+    predicted = []
     for path in files:
         slide_id = slide_id_from(path.name)
         with Image.open(path) as image:
@@ -264,6 +265,7 @@ def predict(
                 slide_id, path.name, image.size, detections, f"model:{card.dataset_hash[:8]}"
             )
         save_annotation(annotation, out / "canonical")
+        predicted.append(annotation)
         totals = count(detections, card.classes)
         rows.append({"slide": slide_id, **totals, "total": sum(totals.values())})
         typer.echo(f"{slide_id}: " + ", ".join(f"{n} {name}" for name, n in totals.items()))
@@ -272,6 +274,10 @@ def predict(
         writer = csv.DictWriter(handle, fieldnames=["slide", *card.classes, "total"])
         writer.writeheader()
         writer.writerows(rows)
+    # A draft most annotation tools can open, to be corrected by a person.
+    (out / "predictions.coco.json").write_text(
+        json.dumps(to_coco(predicted), indent=1), encoding="utf-8", newline=NEWLINE
+    )
     typer.echo(f"marked images, counts.csv and annotations written to {out}")
     typer.echo("These counts have no known error until the model is evaluated (`evaluate`).")
 

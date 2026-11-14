@@ -249,6 +249,9 @@ def test_cli_from_synthetic_slides_to_an_evaluation(tmp_path):
         assert int(row["small"]) == annotation.counts().get("small", 0)
     assert (out / "synthetic-001.png").is_file()
     assert len(load_annotations(out / "canonical")) == 6
+    draft = json.loads((out / "predictions.coco.json").read_text(encoding="utf-8"))
+    assert len(draft["images"]) == 6
+    assert len(draft["annotations"]) == sum(len(a.cells) for a in annotations)
 
     evaluated = runner.invoke(app, ["evaluate", "-p", str(demo)])
     assert evaluated.exit_code == 0, evaluated.output
