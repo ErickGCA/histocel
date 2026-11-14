@@ -4,7 +4,7 @@ A command line tool to train and use models that **outline, classify and count c
 
 histocel ships no images, no classes and no pretrained models. You point it at your slides and annotations, declare your classes, and run.
 
-> **Status: pre-alpha.** You can create a project, import annotations (COCO, YOLO-seg, QuPath GeoJSON) and check it for problems, build the training dataset and train a model. Whole-slide inference and evaluation are under construction. See the [roadmap](#roadmap).
+> **Status: pre-alpha.** You can create a project, import annotations (COCO, YOLO-seg, QuPath GeoJSON) and check it for problems, build the training dataset, train a model, analyse whole slides and grade the model on test slides. It has been exercised on synthetic slides only so far; expect rough edges on real data. See the [roadmap](#roadmap).
 
 ## Why it exists
 
@@ -94,6 +94,37 @@ Each run gets a folder under `runs/`:
 
 The scores printed by `train` are measured on validation tiles and only steer training. The final score comes from whole test slides, in the evaluation stage.
 
+## Analysing slides
+
+```bash
+histocel predict new-slides/ --out results
+```
+
+The slide is cut with the tile size and overlap the model was trained with, each tile is analysed, and detections of the same cell coming from neighbouring tiles are merged so it is counted once. `results/` receives:
+
+- one image per slide with every cell outlined in its class colour;
+- `counts.csv`, with the number of cells per class on each slide;
+- `canonical/`, the predictions in histocel's annotation format, marked as made by a model and not reviewed.
+
+By default the latest run of the project is used; choose another with `--run` or point to any model folder with `--model`.
+
+## Grading a model
+
+```bash
+histocel evaluate
+```
+
+`evaluate` runs the model on the slides listed under `split.test`, which nothing in training ever saw, and compares with their annotations. It reports four things separately, because one combined score hides which part failed:
+
+| Question | Metrics |
+|---|---|
+| Was each cell found, whatever its class? | `detection/precision`, `recall`, `f1` |
+| Among the cells found, was the class right? | `classification/accuracy`, `class/<name>/precision`, `recall`, `f1` |
+| How well do the outlines overlap? | `outline/mean_iou` |
+| How far is the count from the real one? | `count/<name>/mean_absolute_error`, `mean_error` (bias), `r2` |
+
+Every number comes with a 95% confidence interval obtained by resampling whole slides. With few test slides the intervals are wide, and the report says so. Two outlines match when their overlap (IoU) is at least `--iou` (default 0.5); scores obtained with different thresholds do not compare. The report is saved as `evaluation.json` next to the model.
+
 ## Roadmap
 
 | Stage | Delivers | Status |
@@ -102,7 +133,7 @@ The scores printed by `train` are measured on validation tiles and only steer tr
 | 2 | `init`, `import` (COCO, YOLO-seg, QuPath GeoJSON) and `check` | done |
 | 3 | `build`: split by slide and group, tiling, manifest | done |
 | 4 | `train`: training engine, run records, Colab notebook | done |
-| 5 | Whole-slide `predict` and `evaluate` with counting error | to do |
+| 5 | Whole-slide `predict` and `evaluate` with counting error | done |
 | 6 | Box input with assisted outlines (SAM) | to do |
 | 7 | User guide and version 0.1 | to do |
 
