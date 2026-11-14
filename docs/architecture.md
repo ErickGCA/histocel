@@ -35,6 +35,7 @@ Everything to the right of the canonical format is derived: it can be deleted an
 | `store.py` | Read and write the canonical format on disk | `core` |
 | `synthetic/` | Generate fake slides with an exact answer key | `core` |
 | `sources/` | Convert annotation tool exports to the canonical format | `core`, `store` |
+| `assist/` | Turn a human hint (a box) into an outline; the only other place that knows a model library | `core` |
 | `dataset/` | Split, tile and export the training dataset | `core`, `store` |
 | `engines/` | Train and predict; the only place that knows the training library | `core` |
 | `inference/`, `evaluation/` | Analyse whole slides; measure against ground truth | `core`, `store`, `engines` |
@@ -62,7 +63,7 @@ Everything to the right of the canonical format is derived: it can be deleted an
 
 **D9. Detection, classification, outline and counting are reported separately.** A single combined score hides which part failed, and IoU at 0.5 is harsh on objects as small as cells: a few boundary pixels turn a correct detection into a miss. So `evaluate` reports (1) detection F1 on cell-vs-background, with the matching rule and threshold stated, (2) per-class precision and recall over matched cells, (3) outline quality over matched cells, and (4) counting agreement per class across slides: absolute error and R², the measure the CoNIC challenge uses for counting. Statistics are pooled over slides before computing per-class scores, so a class absent from one slide does not distort the result. Panoptic Quality is reported as a secondary number for comparison with other work (mask mAP is not computed yet); the literature disagrees on PQ (Metrics Reloaded recommends it, Foucart et al. argue against it for nuclei). Every number comes with a bootstrap confidence interval resampled by slide, never the standard error across cross-validation folds, which understates uncertainty. With tens of slides the intervals are wide, and the report says so.
 
-**D10. Boxes as an annotation shortcut.** The product is segmentation only; users who have boxes can turn them into outlines with SAM (an optional extra), and the result is stored as assisted and not reviewed.
+**D10. Boxes as an annotation shortcut.** The product is segmentation only; users who have boxes can turn them into outlines with SAM (an optional extra), and the result is stored as assisted and not reviewed. Outliners are found by name in `assist/`, like engines and sources.
 
 **D11. The training engine sits behind an interface.** The first engine is Ultralytics YOLO-seg; only `engines/ultralytics.py` imports it. Candidates for a second engine: Cellpose and StarDist. Both train from integer label masks rather than polygons (StarDist takes classes as a per-image dictionary of instance id to class), so the engine interface receives canonical annotations and each engine owns its export format.
 

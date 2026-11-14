@@ -2,7 +2,9 @@
 
 This project follows [Semantic Versioning](https://semver.org/). Until 1.0, minor versions may break compatibility.
 
-## Unreleased
+## 0.1.0 - 2026-11-14
+
+First release. The whole path works on synthetic slides; it has not been validated on real tissue yet.
 
 ### Added
 
@@ -20,3 +22,12 @@ This project follows [Semantic Versioning](https://semver.org/). Until 1.0, mino
 - Colab notebook that installs histocel and runs the same commands on a GPU.
 - `histocel predict`: whole-slide inference with tiling and duplicate merging; writes marked images, a counts table and predictions in the canonical format.
 - `histocel evaluate`: grades a model on the frozen test slides, reporting detection, classification, outline quality and counting separately, each with a bootstrap confidence interval by slide.
+- Box annotations (`yolo-bbox`) turned into outlines by a Segment Anything model (optional `sam` extra), recorded as assisted and not reviewed.
+- `histocel predict` also writes `predictions.coco.json`, a draft to correct in an annotation tool.
+- User guide.
+
+### Known limits
+
+- Images are read whole into memory; gigapixel whole-slide images are not supported.
+- An interrupted training run cannot be resumed.
+- Mask mAP is not computed.

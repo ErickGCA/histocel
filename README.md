@@ -4,7 +4,7 @@ A command line tool to train and use models that **outline, classify and count c
 
 histocel ships no images, no classes and no pretrained models. You point it at your slides and annotations, declare your classes, and run.
 
-> **Status: pre-alpha.** You can create a project, import annotations (COCO, YOLO-seg, QuPath GeoJSON) and check it for problems, build the training dataset, train a model, analyse whole slides and grade the model on test slides. It has been exercised on synthetic slides only so far; expect rough edges on real data. See the [roadmap](#roadmap).
+> **Status: 0.1, early release.** The whole path works: create a project, import annotations, check it, build the dataset, train, analyse whole slides and grade the model on test slides. It has been exercised on synthetic slides only so far; expect rough edges on real data. Start with the [user guide](docs/guide.md).
 
 ## Why it exists
 
@@ -72,6 +72,7 @@ Put your images in `my-project/raw/images/` and your annotation exports in `my-p
 | COCO instance segmentation | `coco` | One JSON file. Polygon outlines only; RLE masks are skipped. |
 | YOLO segmentation | `yolo-seg` | A folder of `.txt` files. Needs `names: [...]` in the source. |
 | QuPath GeoJSON | `qupath` | One `.geojson` per image, named after the image. |
+| YOLO detection boxes | `yolo-bbox` | A folder of `.txt` files. Needs `names` and `assist: sam`, which turns each box into an outline. |
 
 `check` stops you before the mistakes that are expensive to find later: a class name nobody declared, slides of one animal on both sides of the split, a test slide whose outlines no person ever reviewed, an overlap smaller than your largest cell.
 
@@ -91,6 +92,20 @@ my-project/
 ```
 
 The internal annotation format is described in [docs/canonical-format.md](docs/canonical-format.md).
+
+## Boxes instead of outlines
+
+Drawing a box around a cell is several times faster than drawing its outline. With the optional `sam` extra, a source of boxes is turned into outlines by a Segment Anything model:
+
+```yaml
+sources:
+  - format: yolo-bbox
+    path: raw/annotations/boxes
+    names: [cell-type-a, cell-type-b]
+    assist: sam
+```
+
+Those outlines are stored as assisted and not reviewed. They can train a model, but they cannot grade one until a person has checked them and the source says `reviewed: true`.
 
 ## The training dataset
 
@@ -161,10 +176,12 @@ Every number comes with a 95% confidence interval obtained by resampling whole s
 | 3 | `build`: split by slide and group, tiling, manifest | done |
 | 4 | `train`: training engine, run records, Colab notebook | done |
 | 5 | Whole-slide `predict` and `evaluate` with counting error | done |
-| 6 | Box input with assisted outlines (SAM) | to do |
-| 7 | User guide and version 0.1 | to do |
+| 6 | Box input with assisted outlines (SAM) | done |
+| 7 | User guide and version 0.1 | done |
 
-Design decisions and their reasons are in [docs/architecture.md](docs/architecture.md).
+What comes next: reading gigapixel whole-slide images by region, resuming an interrupted training run, mask mAP, and a second training engine.
+
+The [user guide](docs/guide.md) walks through every step and explains how to read the evaluation. Design decisions and their reasons are in [docs/architecture.md](docs/architecture.md).
 
 ## Development
 
