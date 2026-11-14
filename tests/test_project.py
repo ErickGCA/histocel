@@ -105,3 +105,25 @@ def test_dataset_settings_are_parsed(tmp_path):
     )
     dataset = load_project(root).dataset
     assert (dataset.grouping, dataset.min_visible, dataset.background) == ("one", 0.5, 0.0)
+
+
+def test_training_settings_are_parsed_and_validated(tmp_path):
+    root = _write(
+        tmp_path,
+        "classes: [a]\ntraining: {engine: other, model: m.pt, epochs: 5, image_size: 320}\n",
+    )
+    training = load_project(root).training
+    assert training.engine == "other"
+    assert (training.settings.model, training.settings.epochs) == ("m.pt", 5)
+    assert (training.settings.image_size, training.settings.batch) == (320, 16)
+
+    defaults = load_project(_write(tmp_path, "classes: [a]\n")).training
+    assert defaults.engine == "ultralytics" and defaults.settings.epochs == 100
+
+    for text, message in [
+        ("training: {epochs: many}", "are numbers"),
+        ("training: {epochs: 0}", "must be positive"),
+        ("training: {epoch: 3}", "unknown key"),
+    ]:
+        with pytest.raises(ProjectError, match=message):
+            load_project(_write(tmp_path, "classes: [a]\n" + text + "\n"))

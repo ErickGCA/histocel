@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import typer
@@ -23,6 +24,7 @@ from histocel.project import (
 from histocel.sources.coco import to_coco
 from histocel.store import load_annotations
 from histocel.synthetic import default_styles, generate_slide
+from histocel.training import TrainingError, list_runs, train_run
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -126,6 +128,59 @@ def build(
         )
     typer.echo(f"dataset hash: {report.dataset_hash[:16]}")
     typer.echo(f"written to {report.path}")
+
+
+@app.command()
+def train(
+    project: Path | None = PROJECT_OPTION,
+    dataset: str = typer.Option("default", help="Dataset to train on, as built by `build`."),
+    name: str | None = typer.Option(None, help="Label added to the run folder name."),
+    engine: str | None = typer.Option(None, help="Training engine. Default: from histocel.yaml."),
+    model: str | None = typer.Option(None, help="Starting model, engine-specific."),
+    epochs: int | None = typer.Option(None, min=1),
+    image_size: int | None = typer.Option(None, min=32, help="Tiles are resized to this."),
+    batch: int | None = typer.Option(None, min=1),
+    device: str | None = typer.Option(None, help="For example: cpu, 0. Default: automatic."),
+) -> None:
+    """Train a model on a built dataset and record the run under runs/."""
+    loaded = _project(project)
+    overrides = {
+        "model": model,
+        "epochs": epochs,
+        "image_size": image_size,
+        "batch": batch,
+        "device": device,
+    }
+    settings = replace(
+        loaded.training.settings, **{k: v for k, v in overrides.items() if v is not None}
+    )
+    try:
+        run = train_run(
+            loaded, settings, dataset=dataset, engine=engine or loaded.training.engine, name=name
+        )
+    except TrainingError as error:
+        raise _fail(str(error)) from None
+    typer.echo(f"run {run.run_id}: {run.data['epochs_run']} epoch(s)")
+    for metric, value in run.data["validation_tiles"].items():
+        typer.echo(f"  {metric:<16}{value:.3f}  (validation tiles)")
+    typer.echo(f"model written to {run.model_dir}")
+
+
+@app.command()
+def runs(project: Path | None = PROJECT_OPTION) -> None:
+    """List the recorded training runs of the project."""
+    records = list_runs(_project(project))
+    if not records:
+        typer.echo("no runs yet. Train one with `histocel train`.")
+        return
+    width = max(len(r.run_id) for r in records)
+    typer.echo(f"{'run':<{width}}  {'dataset':<10}{'epochs':>7}{'mask mAP50':>12}")
+    for record in records:
+        score = record.data.get("validation_tiles", {}).get("mask_map50")
+        typer.echo(
+            f"{record.run_id:<{width}}  {record.data['dataset']['hash'][:8]:<10}"
+            f"{record.data['epochs_run']:>7}{(f'{score:.3f}' if score is not None else '-'):>12}"
+        )
 
 
 @app.command()

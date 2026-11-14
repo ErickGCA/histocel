@@ -15,9 +15,19 @@ import yaml
 
 from histocel.core.annotation import METHOD_MANUAL, METHODS
 from histocel.core.taxonomy import Taxonomy, TaxonomyError
+from histocel.engines.base import TrainSettings
 
 CONFIG_NAME = "histocel.yaml"
-TOP_LEVEL_KEYS = {"classes", "groupings", "sources", "slides", "split", "tiling", "dataset"}
+TOP_LEVEL_KEYS = {
+    "classes",
+    "groupings",
+    "sources",
+    "slides",
+    "split",
+    "tiling",
+    "dataset",
+    "training",
+}
 SOURCE_KEYS = {"format", "path", "method", "reviewed", "annotator", "group", "searched", "names"}
 
 
@@ -60,6 +70,12 @@ class DatasetConfig:
 
 
 @dataclass(frozen=True)
+class TrainingConfig:
+    engine: str = "ultralytics"
+    settings: TrainSettings = TrainSettings()
+
+
+@dataclass(frozen=True)
 class Project:
     root: Path
     taxonomy: Taxonomy
@@ -68,6 +84,7 @@ class Project:
     split: SplitConfig = SplitConfig()
     tiling: TilingConfig = TilingConfig()
     dataset: DatasetConfig = DatasetConfig()
+    training: TrainingConfig = TrainingConfig()
 
     @property
     def images_dir(self) -> Path:
@@ -198,6 +215,27 @@ def load_project(root: Path) -> Project:
             f"dataset.grouping: {dataset_config.grouping!r} is not declared under `groupings`"
         )
 
+    training = _mapping(data.get("training"), "training")
+    setting_keys = {"model", "epochs", "image_size", "batch", "patience", "seed", "device"}
+    _unknown_keys(training, setting_keys | {"engine"}, "training")
+    try:
+        settings = TrainSettings(
+            **{
+                key: (str(value) if key in ("model", "device") else int(value))
+                for key, value in training.items()
+                if key in setting_keys and value is not None
+            }
+        )
+    except (TypeError, ValueError):
+        raise ProjectError(
+            "training: epochs, image_size, batch, patience and seed are numbers"
+        ) from None
+    if min(settings.epochs, settings.image_size, settings.batch) <= 0 or settings.patience < 0:
+        raise ProjectError("training: epochs, image_size and batch must be positive")
+    training_config = TrainingConfig(
+        engine=str(training.get("engine", TrainingConfig.engine)), settings=settings
+    )
+
     return Project(
         root=root.resolve(),
         taxonomy=taxonomy,
@@ -210,6 +248,7 @@ def load_project(root: Path) -> Project:
         ),
         tiling=tiling_config,
         dataset=dataset_config,
+        training=training_config,
     )
 
 
@@ -263,6 +302,16 @@ tiling:
 #   grouping: coarse    # train on a named grouping instead of the individual classes
 #   min_visible: 0.25   # a cell enters a tile when at least this share of it is inside
 #   background: 0.1     # share of the tiles without any cell kept as background examples
+
+# Optional: training settings. Each can also be given on the command line.
+# training:
+#   engine: ultralytics
+#   model: yolo11n-seg.pt   # starting point; larger: yolo11s-seg.pt, yolo11m-seg.pt
+#   epochs: 100
+#   image_size: 640         # tiles are resized to this before entering the model
+#   batch: 16
+#   patience: 30            # stop after this many epochs without improvement
+#   seed: 0
 """
 
 
