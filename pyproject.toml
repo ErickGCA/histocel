@@ -26,6 +26,10 @@ dependencies = [
     "typer>=0.12",
 ]
 
+[project.optional-dependencies]
+# The training engine. Kept optional: it pulls in PyTorch.
+train = ["ultralytics>=8.3,<9"]
+
 [project.scripts]
 histocel = "histocel.cli:app"
 
@@ -54,3 +58,4 @@ ignore = ["B008"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = ["slow: trains a real model; needs the `train` extra"]
