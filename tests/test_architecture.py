@@ -75,5 +75,7 @@ def test_repository_ships_no_data():
         and p.suffix.lower() in DATA_SUFFIXES
         and not ignored & set(p.relative_to(ROOT).parts)
         and not p.relative_to(ROOT).parts[0].startswith(".venv")
+        # Figures for the documentation, all generated from synthetic slides.
+        and p.relative_to(ROOT).parts[:2] != ("docs", "images")
     ]
     assert offenders == [], f"data files found in the repository: {offenders}"

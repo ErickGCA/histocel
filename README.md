@@ -32,6 +32,33 @@ histocel build -p demo       # tiled training dataset + manifest
 
 `synth` creates six synthetic slides in `demo/` (coloured ellipses on a pinkish background), a COCO export with the exact outline of every cell, and a `histocel.yaml`. They look nothing like real tissue: they exist to show the tool working and to test the code against a known answer.
 
+## Example run
+
+The whole pipeline, run on the synthetic slides that ship with the tool. They are coloured ellipses drawn by code, far easier than real tissue, so read this as a demonstration that every stage works and can be reproduced, not as a claim about real slides.
+
+```bash
+histocel synth demo --slides 12
+histocel import -p demo && histocel build -p demo
+histocel train -p demo --epochs 25 --image-size 320 --device cpu
+histocel evaluate -p demo
+histocel predict demo/raw/images/synthetic-011.png -p demo
+```
+
+<p align="center">
+  <img src="docs/images/example-prediction.png" alt="A synthetic slide with every detected cell outlined in its class colour" width="520" />
+</p>
+
+Eight slides trained the model (192 tiles, 709 cells), two validated it and two were held out for the final score. Training took about 20 minutes on a laptop CPU. On the two held-out slides (80 cells):
+
+| What was measured | Result |
+|---|---|
+| Cells found (`detection/f1`) | 1.000 |
+| Class correct among cells found (`classification/accuracy`) | 1.000 |
+| Outline overlap (`outline/mean_iou`) | 0.914 |
+| Counting error per slide, both classes (`count/*/mean_absolute_error`) | 0 cells |
+
+With only two test slides the confidence intervals mean little; `evaluate` prints that warning itself.
+
 ## With your own data
 
 ```bash
