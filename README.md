@@ -4,7 +4,7 @@ A command line tool to train and use models that **outline, classify and count c
 
 histocel ships no images, no classes and no pretrained models. You point it at your slides and annotations, declare your classes, and run.
 
-> **Status: pre-alpha.** You can create a project, import annotations (COCO, YOLO-seg, QuPath GeoJSON) and check it for problems. Dataset building, training, inference and evaluation are under construction. See the [roadmap](#roadmap).
+> **Status: pre-alpha.** You can create a project, import annotations (COCO, YOLO-seg, QuPath GeoJSON) and check it for problems and build the training dataset. Training, inference and evaluation are under construction. See the [roadmap](#roadmap).
 
 ## Why it exists
 
@@ -27,6 +27,7 @@ pip install -e .
 histocel synth demo          # a complete project of synthetic slides
 histocel import -p demo      # annotations -> canonical format
 histocel check -p demo       # problems to fix before training
+histocel build -p demo       # tiled training dataset + manifest
 ```
 
 `synth` creates six synthetic slides in `demo/` (coloured ellipses on a pinkish background), a COCO export with the exact outline of every cell, and a `histocel.yaml`. They look nothing like real tissue: they exist to show the tool working and to test the code against a known answer.
@@ -64,13 +65,22 @@ my-project/
 
 The internal annotation format is described in [docs/canonical-format.md](docs/canonical-format.md).
 
+## The training dataset
+
+`histocel build` writes `datasets/default/` in YOLO segmentation layout: overlapping tiles of the training and validation slides, their labels, a `data.yaml` and a `manifest.json`.
+
+- **Test slides are left out entirely.** They are only read later, as whole slides, by evaluation.
+- **Cells on a tile border are cut by real geometry**, and with an overlap larger than your largest cell every cell is whole in at least one tile.
+- **A share of the empty tiles is kept** so the model also sees plain background.
+- **The manifest holds a hash of the content.** Same annotations and settings, same hash, on any machine. Treat the folder as disposable: never edit it, rebuild it.
+
 ## Roadmap
 
 | Stage | Delivers | Status |
 |---|---|---|
 | 1 | Pure core, synthetic slides, tests and CI | done |
 | 2 | `init`, `import` (COCO, YOLO-seg, QuPath GeoJSON) and `check` | done |
-| 3 | `build`: split by slide and group, tiling, manifest | to do |
+| 3 | `build`: split by slide and group, tiling, manifest | done |
 | 4 | `train`: training engine, run records, Colab notebook | to do |
 | 5 | Whole-slide `predict` and `evaluate` with counting error | to do |
 | 6 | Box input with assisted outlines (SAM) | to do |
