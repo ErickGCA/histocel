@@ -14,7 +14,7 @@ Computer vision projects in histology tend to trip in the same places. histocel 
 - **A frozen test set** that never picks the model and is only read by evaluation.
 - **AI-made ground truth does not grade AI.** Every outline records how it was made; the test set only accepts outlines drawn or reviewed by a person.
 - **Tile with overlap and merge on the way back**, so a cell on the border between two tiles is counted once.
-- **Measure counting error**, not just outline quality, with a confidence interval.
+- **Report detection, classification, outline quality and counting error separately**, each with a confidence interval.
 - **Everything is rebuilt by a command.** The training dataset comes from data plus configuration, identically every time.
 
 ## Try it without any data
