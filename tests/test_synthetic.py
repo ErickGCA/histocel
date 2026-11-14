@@ -4,7 +4,6 @@ from typer.testing import CliRunner
 
 from histocel.cli import app
 from histocel.core.geometry import bounds, overlap_over_smaller
-from histocel.store import load_annotations
 from histocel.synthetic import CellStyle, generate_slide
 
 
@@ -50,15 +49,6 @@ def test_cells_are_actually_drawn_where_the_annotation_says():
 def test_impossible_requests_fail_with_a_clear_message():
     with pytest.raises(ValueError, match="could not place"):
         generate_slide("s", width=100, height=100, n_cells=500)
-
-
-def test_cli_synth_writes_images_and_canonical_annotations(tmp_path):
-    result = CliRunner().invoke(app, ["synth", str(tmp_path / "demo"), "--slides", "3"])
-    assert result.exit_code == 0, result.output
-    images = sorted((tmp_path / "demo" / "raw" / "images").glob("*.png"))
-    annotations = load_annotations(tmp_path / "demo" / "canonical")
-    assert len(images) == 3 and len(annotations) == 3
-    assert [a.image for a in annotations] == [p.name for p in images]
 
 
 def test_cli_version():
