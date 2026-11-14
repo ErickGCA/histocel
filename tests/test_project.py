@@ -87,15 +87,9 @@ tiling: {size: 256, overlap: 32}
         ("classes: {a: {aliases: [x]}, b: {aliases: [X]}}\n", "claimed by both"),
         ("sources: []\n", "at least one class"),
         ("classes: [a\n", "not valid YAML"),
-        ("classes: [a]
-dataset: {grouping: nope}
-", "not declared under"),
-        ("classes: [a]
-dataset: {background: 2}
-", "background in"),
-        ("classes: [a]
-dataset: {min_visible: 0}
-", "min_visible must be"),
+        ("classes: [a]\ndataset: {grouping: nope}\n", "not declared under"),
+        ("classes: [a]\ndataset: {background: 2}\n", "background in"),
+        ("classes: [a]\ndataset: {min_visible: 0}\n", "min_visible must be"),
     ],
 )
 def test_mistakes_in_the_configuration_are_reported(tmp_path, text, message):
@@ -106,11 +100,8 @@ def test_mistakes_in_the_configuration_are_reported(tmp_path, text, message):
 def test_dataset_settings_are_parsed(tmp_path):
     root = _write(
         tmp_path,
-        "classes: [a, b]
-groupings: {one: {x: [a, b]}}
-"
-        "dataset: {grouping: one, min_visible: 0.5, background: 0}
-",
+        "classes: [a, b]\ngroupings: {one: {x: [a, b]}}\n"
+        "dataset: {grouping: one, min_visible: 0.5, background: 0}\n",
     )
     dataset = load_project(root).dataset
     assert (dataset.grouping, dataset.min_visible, dataset.background) == ("one", 0.5, 0.0)
