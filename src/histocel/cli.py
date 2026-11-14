@@ -10,6 +10,7 @@ import yaml
 
 from histocel import __version__
 from histocel.check import ERROR, WARNING, run_checks
+from histocel.dataset import BuildError, build_dataset
 from histocel.ingest import IngestError, import_project
 from histocel.project import (
     CONFIG_NAME,
@@ -103,6 +104,28 @@ def check(project: Path | None = PROJECT_OPTION) -> None:
     typer.echo(f"{errors} error(s), {warnings} warning(s)")
     if not result.ok:
         raise typer.Exit(code=1)
+
+
+@app.command()
+def build(
+    project: Path | None = PROJECT_OPTION,
+    name: str = typer.Option("default", help="Name of the dataset folder under datasets/."),
+) -> None:
+    """Split the slides, cut them into tiles and write the training dataset."""
+    loaded = _project(project)
+    try:
+        report = build_dataset(loaded, load_annotations(loaded.canonical_dir), name=name)
+    except BuildError as error:
+        raise _fail(str(error)) from None
+    typer.echo(f"classes: {', '.join(report.classes)}")
+    typer.echo(f"{'':<6}{'slides':>8}{'tiles':>8}{'empty':>8}{'cells':>8}")
+    for side in ("train", "val"):
+        typer.echo(
+            f"{side:<6}{report.slides[side]:>8}{report.tiles[side]:>8}"
+            f"{report.background_tiles[side]:>8}{report.cells[side]:>8}"
+        )
+    typer.echo(f"dataset hash: {report.dataset_hash[:16]}")
+    typer.echo(f"written to {report.path}")
 
 
 @app.command()
