@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Safety net: this repository ships code only.
+# User projects (images, annotations, datasets, runs, weights) live elsewhere.
+*.pt
+*.pth
+*.onnx
+/data/
+/datasets/
+/runs/
+/scratch/
